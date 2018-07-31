@@ -1,0 +1,13 @@
+version: '3'
+services:
+  lsunroom:
+    image: ufoym/deepo:cpu
+    volumes: 
+      - .:/app/
+    ports:
+      - 8080:8080
+      - 8888:8888
+      - 6060:6060
+    command: tail -f /dev/null
+    working_dir: /app/
+    shm_size: '8gb'
