@@ -3,10 +3,10 @@ from functools import partial
 
 import torch
 import onegan
+from torch.nn import CrossEntropyLoss
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from onegan.estimator import OneEstimator
-from onegan.utils import to_var
 
 
 def training_estimator(model, optimizer, args):
@@ -36,7 +36,7 @@ def training_estimator(model, optimizer, args):
         ''' layout edge constraint loss '''
         if args.edge_factor:
             edge_map = layout_gradient(prediction)
-            edge_loss = F.binary_cross_entropy(edge_map, to_var(data['edge']))
+            edge_loss = F.binary_cross_entropy(edge_map, data['edge'])
             terms['loss/loss'] += edge_loss * args.edge_factor
             terms['loss/edge'] = edge_loss
 
@@ -49,8 +49,8 @@ def training_estimator(model, optimizer, args):
         return terms
 
     def _closure(model, data, volatile=False):
-        source = to_var(data['image'], volatile=volatile)
-        target = to_var(data['label'], volatile=volatile)
+        source = data['image']
+        target = data['label']
         score, pred_type = model(source)
         _, output = torch.max(score, 1)
 
@@ -72,14 +72,14 @@ def training_estimator(model, optimizer, args):
 
     log = logging.getLogger(f'room.{args.name}')
 
-    ce_loss = onegan.losses.CrossEntropyLoss2d()
-    focal_loss = onegan.losses.FocalLoss2d(gamma=args.focal_gamma)
+    ce_loss = CrossEntropyLoss()
+    focal_loss = onegan.loss.FocalLoss2d(gamma=args.focal_gamma)
 
     sobel_y_conv2d = onegan.ops.VisionConv2d('sobel_vertical', padding=2, dilation=2, name='Sobel-Y')
     sobel_x_conv2d = onegan.ops.VisionConv2d('sobel_horizontal', padding=2, dilation=2, name='Sobel-X')
 
     scheduler = ReduceLROnPlateau(optimizer, patience=2, mode='min', factor=0.5, min_lr=1e-8, verbose=True)
-    checkpoint = onegan.extension.Checkpoint(name=args.name, save_epochs=5)
+    checkpoint = onegan.extension.Checkpoint(name=args.name, save_interval=5)
     tensorboard = onegan.extension.TensorBoardLogger(name=args.name, max_num_images=30)
     metric = onegan.metrics.semantic_segmentation.Metric(num_class=args.num_class, only_scalar=True)
     score_metric = onegan.metrics.semantic_segmentation.max_bipartite_matching_score
@@ -91,9 +91,9 @@ def training_estimator(model, optimizer, args):
     log.info('Build training esimator')
     estimator = OneEstimator(
         model, optimizer,
-        lr_scheduler=scheduler, logger=tensorboard, saver=checkpoint, name=args.name)
+        lr_scheduler=scheduler, logger=tensorboard, saver=checkpoint)#, name=args.name)
 
-    return partial(estimator.run, update_fn=partial(_closure), inference_fn=partial(_closure, volatile=True))
+    return partial(estimator.run, closure_fn=partial(_closure))
 
 
 def evaluation_estimator(model, args):
@@ -109,8 +109,8 @@ def evaluation_estimator(model, args):
         return torch.cat([image * .6 + layout * .4, output], dim=3)
 
     def _closure(model, data, volatile=False):
-        source = to_var(data['image'], volatile=volatile)
-        target = to_var(data['label'], volatile=volatile)
+        source = data['image']
+        target = data['label']
         score, pred_type = model(source)
         _, output = torch.max(score, 1)
 
@@ -128,7 +128,7 @@ def evaluation_estimator(model, args):
     colorizer = onegan.extension.Colorizer(colors=colors)
     gallery = onegan.extension.ImageSaver(name=args.name)
     set_gallery = onegan.extension.ImageSaver(savedir='./output/viz_results', name=args.name)
-    checkpoint = onegan.extension.Checkpoint(name=args.name, save_epochs=5)
+    checkpoint = onegan.extension.Checkpoint(name=args.name, save_interval=5)
     metric = onegan.metrics.semantic_segmentation.Metric(num_class=args.num_class, only_scalar=True)
     score_metric = onegan.metrics.semantic_segmentation.max_bipartite_matching_score
 
@@ -142,7 +142,7 @@ def evaluation_estimator(model, args):
 def weights_estimator(model, args):
 
     def _closure(model, data, volatile=False):
-        source = to_var(data['image'], volatile=volatile)
+        source = data['image']
         score, pred_type = model(source)
         _, output = torch.max(score, 1)
         score = score_metric(output, data['label'])
@@ -167,6 +167,6 @@ def weights_estimator(model, args):
 
     log.info('Build weight-searching esimator')
     estimator = OneEstimator(model, name=args.name)
-    ckpt = onegan.extension.Checkpoint(name=args.name, save_epochs=5)
+    ckpt = onegan.extension.Checkpoint(name=args.name, save_interval=5)
 
     return searching

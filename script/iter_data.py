@@ -3,8 +3,8 @@ import time
 
 import click
 
-from datasets.lsun_room.item import DataItems
-from datasets.lsun_room.edge import mapping_func
+from lsun_room.item import DataItems
+from lsun_room.edge import mapping_func
 
 
 @click.command()
@@ -14,7 +14,7 @@ def main(dataset_root):
     for phase in ['train', 'val']:
         print('==> iter for data in %s phase' % phase)
         s = time.time()
-        dataset = DataItems(root_dir=dataset_root, phase=phase)
+        dataset = DataItems(root=dataset_root, phase=phase)
 
         for i, e in enumerate(dataset.items):
             if e.type == 10:
@@ -22,9 +22,12 @@ def main(dataset_root):
                 out = func(e, image_size=(404, 404), width=2)
 
                 import cv2
-                cv2.imshow('edge', out)
-                cv2.waitKey()
-
+                orgfn = "/app/data/lsun_room/images/" + e.name + ".jpg"
+                org = cv2.imread(orgfn)
+                cv2.imwrite('/app/out/org%s.png'%i, org)
+                cv2.imwrite('/app/out/edge%s.png'%i, out)
+                if i > 100:
+                    break
         print('==> Done in %.4f sec.' % (time.time() - s))
 
 

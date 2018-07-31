@@ -12,6 +12,7 @@ from lsun_room.label import Layout
 from lsun_room.loader import LsunRoomDataset as _BaseDataset
 from lsun_room.loader import get_meta
 
+import logging
 
 class LsunRoomDataset(_BaseDataset):
 
@@ -36,10 +37,11 @@ class LsunRoomDataset(_BaseDataset):
              'name': e['name'] + '.png', 'type': e['type']}
             for e in get_meta(dataset_root=root, phase=phase)
         ]
+        print(get_meta(dataset_root=root, phase=phase)[0])
         counter = [0 for i in range(11)]
         for m in meta:
             counter[m['type']] += 1
-        self.logger.info('meta-fold1 -->' + '|'.join([str(c).rjust(4) for c in counter]))
+        #self.logger.info('meta-fold1 -->' + '|'.join([str(c).rjust(4) for c in counter]))
 
         if phase == 'val' or self.args.datafold == 1:
             return meta

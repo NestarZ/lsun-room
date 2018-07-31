@@ -60,15 +60,21 @@ def main(args):
     train_loader, val_loader = create_dataset(args)
     model = create_model(args)
 
+    if args.gpu:
+        get_model = lambda: model.cuda()
+    else:
+        get_model = lambda: model.cpu()
+    
+
     if args.phase == 'train':
         training_estimator = core.training_estimator(
-            torch.nn.DataParallel(model.cuda()),
+            torch.nn.DataParallel(get_model()),
             create_optim(args, model, optim=args.optim), args)
         training_estimator(train_loader, val_loader, epochs=args.epoch)
 
     if args.phase in ['eval', 'eval_search']:
         core_fn = core.evaluation_estimator if args.phase == 'eval' else core.weights_estimator
-        evaluate_estimator = core_fn(torch.nn.DataParallel(model.cuda()), args)
+        evaluate_estimator = core_fn(torch.nn.DataParallel(get_model()), args)
         evaluate_estimator(val_loader)
 
 
@@ -78,6 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('--folder', help='where\'s the dataset')
     parser.add_argument('--dataset', default='lsunroom', choices=['lsunroom', 'hedau', 'sunrgbd'])
     parser.add_argument('--phase', default='eval', choices=['train', 'eval', 'eval_search'])
+    parser.add_argument('--gpu', default=False, type=bool, help='use gpu')
 
     # data
     parser.add_argument('--image_size', type=int)

@@ -10,7 +10,6 @@ class Layout(enum.Enum):
     floor = 4
     ceiling = 5
 
-
 def hex_to_rgb(x):
     return [255 & (x >> 8 * i) for i in (0, 1, 2)][::-1]
 

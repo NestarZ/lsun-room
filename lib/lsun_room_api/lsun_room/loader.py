@@ -2,7 +2,8 @@ import os
 
 import torch
 import scipy.io
-from onegan.io.loader import load_image, BaseDataset
+from onegan.io.loader import BaseDataset
+from onegan.io.functional import load_image
 from onegan.io.transform import SegmentationPair
 
 from lsun_room.edge import gen_edge_map, gen_corner_map

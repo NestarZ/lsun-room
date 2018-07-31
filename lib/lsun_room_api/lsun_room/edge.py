@@ -19,12 +19,12 @@ def draw_line(img, pt1, pt2, width=1, color=(255, 255, 255)):
 
 def _edge_map(e, point_pairs, **kwargs):
     image_size = kwargs.pop('image_size')
-    scale = (e['resolution'][1] / image_size[1],
-             e['resolution'][0] / image_size[0])
+    scale = (e.resolution[1] / image_size[1],
+             e.resolution[0] / image_size[0])
     canvas = np.zeros(image_size)
     for pp in point_pairs:
-        pt1 = e['points'][pp[0] - 1] / scale
-        pt2 = e['points'][pp[1] - 1] / scale
+        pt1 = e.points[pp[0] - 1] / scale
+        pt2 = e.points[pp[1] - 1] / scale
         draw_line(canvas, pt1, pt2, **kwargs)
     return canvas
 
@@ -128,3 +128,7 @@ func_map = {
     9: type9,
     10: type10,
 }
+
+
+def mapping_func(room_type):
+    return func_map[room_type]
