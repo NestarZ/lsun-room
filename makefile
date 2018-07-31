@@ -1,3 +1,7 @@
+build:
+	cd ./lib/OneGan/ && python setup.py install
+	cd ./lib/lsun_room_api// && python setup.py install
+
 train:
 	python main.py \
 		--phase train \
@@ -14,3 +18,4 @@ eval_search:
 	python main.py \
 		--phase eval_search \
 		--arch resnet --pretrain_path output/checkpoint/M-mike-l1.2/
+
