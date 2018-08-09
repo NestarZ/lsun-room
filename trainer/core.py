@@ -36,7 +36,7 @@ def training_estimator(model, optimizer, args):
         ''' layout edge constraint loss '''
         if args.edge_factor:
             edge_map = layout_gradient(prediction)
-            edge_loss = F.binary_cross_entropy(edge_map, data['edge'])
+            edge_loss = F.binary_cross_entropy(edge_map, data['edge'].cuda())
             terms['loss/loss'] += edge_loss * args.edge_factor
             terms['loss/edge'] = edge_loss
 
@@ -49,8 +49,8 @@ def training_estimator(model, optimizer, args):
         return terms
 
     def _closure(model, data, volatile=False):
-        source = data['image']
-        target = data['label']
+        source = data['image'].cuda()
+        target = data['label'].cuda()
         score, pred_type = model(source)
         _, output = torch.max(score, 1)
 
@@ -91,7 +91,7 @@ def training_estimator(model, optimizer, args):
     log.info('Build training esimator')
     estimator = OneEstimator(
         model, optimizer,
-        lr_scheduler=scheduler, logger=tensorboard, saver=checkpoint)#, name=args.name)
+        lr_scheduler=scheduler, logger=tensorboard, saver=checkpoint, default_handlers=True)#, name=args.name)
 
     return partial(estimator.run, closure_fn=partial(_closure))
 
@@ -109,15 +109,15 @@ def evaluation_estimator(model, args):
         return torch.cat([image * .6 + layout * .4, output], dim=3)
 
     def _closure(model, data, volatile=False):
-        source = data['image']
-        target = data['label']
+        source = data['image'].cpu()
+        target = data['label'].cpu()
         score, pred_type = model(source)
         _, output = torch.max(score, 1)
 
-        set_gallery.image(merge_viz(data['image'], data['label'], output.data.cpu()), filenames=data['filename'])
+        set_gallery.image(merge_viz(data['image'].cpu(), data['label'].cpu(), output.data.cpu()), filenames=data['filename'])
         gallery.image(output.data.float() * (255 / 5), filenames=data['filename'])
 
-        accuracy = metric(output, target)
+        accuracy = metric(output.cpu(), target)
         accuracy['score'] = score_metric(output, target)
 
         return accuracy
@@ -134,7 +134,7 @@ def evaluation_estimator(model, args):
 
     log.info('Build evaluation esimator')
     model = checkpoint.load(args.pretrain_path, model=model)
-    estimator = OneEstimator(model, name=args.name)
+    estimator = OneEstimator(model)
 
     return partial(estimator.evaluate, inference_fn=partial(_closure, volatile=True))
 
@@ -156,6 +156,7 @@ def weights_estimator(model, args):
             estimator.model = m
             estimator.dummy_evaluate(data_loader, inference_fn=inference_fn)
             path_to_cost[path] = estimator.history.get('score_val')
+        #print(estimator.history.metric)
         best_path = max(path_to_cost, key=path_to_cost.get)
 
         accuracy = path_to_cost[best_path]
@@ -166,7 +167,7 @@ def weights_estimator(model, args):
     score_metric = onegan.metrics.semantic_segmentation.max_bipartite_matching_score
 
     log.info('Build weight-searching esimator')
-    estimator = OneEstimator(model, name=args.name)
+    estimator = OneEstimator(model)
     ckpt = onegan.extension.Checkpoint(name=args.name, save_interval=5)
 
     return searching

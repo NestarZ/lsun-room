@@ -6,6 +6,7 @@
 sandbox/
 output/
 logs*/
+exp/
 
 *.egg
 *.pyc
