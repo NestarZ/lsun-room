@@ -22,3 +22,16 @@ eval_search:
 		--arch resnet --pretrain_path exp/checkpoint/experience_v1_08-09T16-44/ \
 		--gpu True
 
+export: build
+	python main.py \
+		--phase export \
+		--arch resnet --pretrain_path exp/checkpoints/experience_v1_08-09T16-44/net-29.pt \
+		--name Test --tri_visual \
+		--gpu True
+
+tf_eval: build
+	python main.py \
+		--phase tf_eval \
+		--arch resnet --pretrain_path exp/checkpoints/experience_v1_08-09T16-44/net-29.pt \
+		--name Test_TF \
+		--gpu True \

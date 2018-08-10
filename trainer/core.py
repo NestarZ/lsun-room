@@ -114,6 +114,8 @@ def evaluation_estimator(model, args):
         score, pred_type = model(source)
         _, output = torch.max(score, 1)
 
+        raise Exception(data['image'].shape, data['label'].shape, output.data.cpu().shape, output.shape)
+
         set_gallery.image(merge_viz(data['image'].cpu(), data['label'].cpu(), output.data.cpu()), filenames=data['filename'])
         gallery.image(output.data.float() * (255 / 5), filenames=data['filename'])
 

@@ -27,7 +27,9 @@ class Colorizer(Extension):
     def apply(self, label):
         if label.dim() == 4:
             label = label.squeeze(1)
-        assert label.dim() == 3
+        if label.dim() == 5:
+            label = label.squeeze(1).squeeze(1)
+        assert label.dim() == 3, label.dim()
         n, h, w = label.size()
 
         canvas = torch.zeros(n, h, w, self.num_channel)

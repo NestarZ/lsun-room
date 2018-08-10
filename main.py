@@ -4,8 +4,17 @@ import logging
 import torch
 import onegan
 
+from torch.autograd import Variable
+
 from trainer import core
 from trainer.model import ResPlanarSeg
+
+import scipy.misc
+
+import onnx
+import onnx_tf
+import onnx_tf.backend as tf_backend
+import tensorflow as tf
 
 
 def create_dataset(args):
@@ -52,6 +61,14 @@ def hyperparams_search(args):
         print(f'Experiment#{i + 1}:', args.name)
         main(args)
 
+def onnx2tf(onnx_model_fn, tf_model_fn):
+    """
+    https://github.com/onnx/onnx-tensorflow/issues/231
+    https://github.com/onnx/onnx-tensorflow/blob/master/doc/API.md
+    """
+    model = onnx.load(onnx_model_fn)
+    tf_rep = tf_backend.prepare(model)
+    tf_rep.export_graph(path=tf_model_fn)
 
 def main(args):
     log = logging.getLogger('room')
@@ -76,14 +93,26 @@ def main(args):
         core_fn = core.evaluation_estimator if args.phase == 'eval' else core.weights_estimator
         evaluate_estimator = core_fn(torch.nn.DataParallel(get_model()), args)
         evaluate_estimator(val_loader)
-
+    
+    if args.phase == 'export':
+        dummy_input = Variable(torch.randn(1, 3, 320, 320)).cuda()
+        checkpoint = onegan.extension.Checkpoint(name=args.name, save_interval=5)
+        model = checkpoint.load(args.pretrain_path, model=get_model(), remove_module=True)
+        torch.onnx.export(model, dummy_input, "my_model.onnx", export_params=True)
+        print("Exported to ONNX format.")
+        onnx_model_fn = 'my_model.onnx'
+        tf_model_fn = 'my_model.pbtxt'
+        model = onnx.load(onnx_model_fn)
+        tf_rep = tf_backend.prepare(model)
+        tf_rep.export_graph(tf_model_fn)
+        print("Exported to TF format.")
 
 if __name__ == '__main__':
     parser = onegan.option.Parser(description='Indoor room corner detection', config='./config.yml')
     parser.add_argument('--name', help='experiment name')
     parser.add_argument('--folder', help='where\'s the dataset')
     parser.add_argument('--dataset', default='lsunroom', choices=['lsunroom', 'hedau', 'sunrgbd'])
-    parser.add_argument('--phase', default='eval', choices=['train', 'eval', 'eval_search'])
+    parser.add_argument('--phase', default='eval', choices=['train', 'eval', 'eval_search', 'export', 'tf_eval'])
     parser.add_argument('--gpu', default=False, type=bool, help='use gpu')
 
     # data

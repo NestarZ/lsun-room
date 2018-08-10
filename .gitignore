@@ -7,6 +7,8 @@ sandbox/
 output/
 logs*/
 exp/
+models/
+log/
 
 *.egg
 *.pyc
