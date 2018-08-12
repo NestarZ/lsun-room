@@ -67,7 +67,7 @@ def onnx2tf(onnx_model_fn, tf_model_fn):
     https://github.com/onnx/onnx-tensorflow/blob/master/doc/API.md
     """
     model = onnx.load(onnx_model_fn)
-    tf_rep = tf_backend.prepare(model)
+    tf_rep = tf_backend.prepare(model, strict=False)
     tf_rep.export_graph(path=tf_model_fn)
 
 def main(args):
@@ -95,15 +95,16 @@ def main(args):
         evaluate_estimator(val_loader)
     
     if args.phase == 'export':
+        onnx_model_fn = './models/onnx/my_model.onnx'
+        tf_model_fn = './models/tf/my_model.pb'
+
         dummy_input = Variable(torch.randn(1, 3, 320, 320)).cuda()
         checkpoint = onegan.extension.Checkpoint(name=args.name, save_interval=5)
         model = checkpoint.load(args.pretrain_path, model=get_model(), remove_module=True)
-        torch.onnx.export(model, dummy_input, "my_model.onnx", export_params=True)
+        torch.onnx.export(model, dummy_input, onnx_model_fn, export_params=True)
         print("Exported to ONNX format.")
-        onnx_model_fn = 'my_model.onnx'
-        tf_model_fn = 'my_model.pbtxt'
         model = onnx.load(onnx_model_fn)
-        tf_rep = tf_backend.prepare(model)
+        tf_rep = tf_backend.prepare(model, strict=False) # https://github.com/onnx/onnx-tensorflow/issues/167
         tf_rep.export_graph(tf_model_fn)
         print("Exported to TF format.")
 

@@ -47,7 +47,7 @@ class Predictor:
         # return graph, sess
 
     def build_model_from_onnx(self):
-        model = onnx.load('my_model.onnx')
+        model = onnx.load('models/onnx/my_model.onnx')
         tf_rep = prepare(model)
         return tf_rep
 
@@ -58,6 +58,7 @@ class Predictor:
 
             score = self.model.run(batched_img)
             #score, _ = self.sess.run(logits, feed_dict={images : rand})
+            print(score._0.shape)
             score = torch.tensor(score._0)
             print(score.shape)
             
