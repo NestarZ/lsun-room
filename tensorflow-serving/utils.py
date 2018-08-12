@@ -1,4 +1,3 @@
-import click
 import cv2
 from PIL import Image
 
@@ -12,6 +11,13 @@ from sklearn import svm
 
 import scipy
 
+class Layout(enum.Enum):
+    frontal = 0
+    left = 1
+    right = 2
+    floor = 3
+    ceiling = 4
+    
 class Colorizer():
     def __init__(self, colors, num_output_channel=3):
         self.colors = self.normalized_color(colors)
@@ -76,8 +82,6 @@ class Model:
                 x:input_images 
             })
         return y_out
-        
-            
 
 class Predictor:
 
@@ -107,7 +111,7 @@ class Predictor:
 
             image = (batched_img / 2 + .5)
             layout = self.colorizer.apply(output)
-            return image *.7 + layout * .3, output
+            return image *.0 + layout * 1, output
 
         raw = np.array(raw)
         raw = cv2.normalize(raw.astype(np.float32), None, alpha=-0.5, beta=0.5,\
@@ -129,13 +133,6 @@ def get_data(label_map, label_1, label_2):
     labels_value = np.concatenate((labels_value_1, labels_value_2))
     return labels_coord, labels_value
 
-class Layout(enum.Enum):
-    frontal = 0
-    left = 1
-    right = 2
-    floor = 3
-    ceiling = 4
-
 def gen_edge_map(layout):
     import cv2
     lbl = cv2.GaussianBlur(layout.astype('uint8'), (3, 3), 0)
@@ -155,33 +152,34 @@ def connectedness(label_map, label_1, label_2):
                     return True
     return False
 
-colorizer = Colorizer(
-            colors=[
-                [249, 69, 93], [255, 229, 170], [144, 206, 181],
-                [81, 81, 119], [241, 247, 210]])
-
-def discard_smallest_blobs(array, label_num):
-    t = colorizer.apply(array).squeeze().transpose((1, 2, 0))
-    print(t.shape)
-
-    plt.imshow(t, cmap = 'gray', interpolation = 'bicubic')
-    plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-    plt.show()
-
-    import numpy as np
+def discard_smallest_blobs(array, label_num, discard_value=-1, plot_diff=False):
+    """
+    Discard the largest area of a specific value in a 2D numpy array
+    https://stackoverflow.com/questions/20110232/python-efficient-way-to-find-the-largest-area-of-a-specific-value-in-a-2d-nump
+    """
     from scipy import ndimage
+
+    colorizer = Colorizer(
+                colors=[
+                    [249, 69, 93], [255, 229, 170], [144, 206, 181],
+                    [81, 81, 119], [241, 247, 210]])
+
+    before_img = colorizer.apply(array).squeeze().transpose((1, 2, 0))
+
     label, num_label = ndimage.label(array == label_num)
     size = np.bincount(label.ravel())
     biggest_label = size[1:].argmax() + 1
     clump_mask = label == biggest_label
-    array[(array == label_num) & (clump_mask == False)] = -1
+    array[(array == label_num) & (clump_mask == False)] = discard_value
 
-    t = colorizer.apply(array).squeeze().transpose((1, 2, 0))
-    print(t.shape)
+    after_img = colorizer.apply(array).squeeze().transpose((1, 2, 0))
 
-    plt.imshow(t, cmap = 'gray', interpolation = 'bicubic')
-    plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-    plt.show()
+    if plot_diff:
+        f, axarr = plt.subplots(1,2)
+        axarr[0].imshow(before_img, cmap = 'gray', interpolation = 'bicubic')
+        axarr[1].imshow(after_img, cmap = 'gray', interpolation = 'bicubic')
+        plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
+        plt.show()
 
     return array
 
@@ -201,75 +199,3 @@ def get_intersect(a1, a2, b1, b2):
     if z == 0:                          # lines are parallel
         return (float('inf'), float('inf'))
     return (x/z, y/z)
-
-@click.command()
-@click.option('--input_size', default=(320, 320), type=(int, int))
-@click.option('--model_path', default=['models/tf/my_model.pb', 'models/onnx/my_model.onnx'][0], type=str)
-def main(input_size, model_path):
-    labels = {
-        Layout.frontal: (Layout.left, Layout.right, Layout.floor, Layout.ceiling),
-        Layout.left: (Layout.right, Layout.floor, Layout.ceiling),
-        Layout.right: (Layout.floor, Layout.ceiling),
-        }
-
-    demo = Predictor(model_path, input_size)
-
-    img = Image.open('/app/hubstairs.jpg').resize(input_size)
-
-    output, label_map = demo.process(img)
-
-    set_label = np.unique(label_map)
-
-    for label_1 in set_label:
-        print(label_1)
-        #label_map = discard_smallest_blobs(label_map, label_1)
-
-    edge = gen_edge_map(label_map)
-    label_map[edge == 0] = -1 
-    lines = []
-    for label_1, label_1_labels in labels.items():
-        if label_1.value not in set_label:
-            continue
-        for label_2 in label_1_labels:
-            if label_2.value not in set_label:
-                continue
-            if not connectedness(label_map, label_1.value, label_2.value):
-                continue
-            
-            X, y = get_data(label_map, label_1.value, label_2.value) 
-
-            # fit the model and get the separating hyperplane
-            clf = svm.LinearSVC(C=500.0, dual=False)
-            clf.fit(X, y)
-
-            W = clf.coef_[0]
-            a = - W[0] / W[1]
-            b = - (clf.intercept_[0]) / W[1]
-
-            xx = np.linspace(0, 320)
-            yy = a * xx + b
-
-            pt1 = int(xx[0]), int(yy[0])
-            pt2 = int(xx[-1]), int(yy[-1])
-
-            cv2.line(output, pt1, pt2, [0,0,1], thickness=1)
-
-            lines.append((pt1,pt2))
-
-    minmax = lambda x, y: (min(320, max(0, x)), min(320, max(0, y)))
-    for pt1, pt2 in lines:
-        cv2.circle(output, minmax(*pt1), 10, [255,0,0], thickness=1, lineType=8, shift=0) 
-        cv2.circle(output, minmax(*pt2), 10, [255,0,0], thickness=1, lineType=8, shift=0) 
-        for pt3, pt4 in lines:
-            if pt1 != pt3 and pt2 != pt4:
-                x, y = get_intersect(pt1, pt2, pt3, pt4)
-                cv2.circle(output, (int(x), int(y)), 5, [255,0,0], thickness=1, lineType=8, shift=0) 
-                plt.imshow(output, cmap = 'gray', interpolation = 'bicubic')
-                plt.xticks([]), plt.yticks([])  # to hide tick values on X and Y axis
-                plt.show()                
-
-    scipy.misc.imsave('output/super_res_output.jpg', output)
-
-
-if __name__ == '__main__':
-    main()
