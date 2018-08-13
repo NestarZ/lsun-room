@@ -67,7 +67,14 @@ class Model:
         self.graph = graph
         #tf.train.write_graph(graph_def, 'pbtxt/', 'protobuf.pbtxt', as_text=True)
 
-    
+    @classmethod
+    def from_onnx(cls, filename):
+        import onnx
+        from onnx_tf.backend import prepare
+        model = onnx.load(filename)
+        tf_rep = prepare(model)
+        return tf_rep
+
     def run(self, input_images):
        
         # We access the input and output nodes 
@@ -94,7 +101,7 @@ class Predictor:
 
     def build_model(self, filename):
         if '.onnx' in filename:
-            raise Exception('Use appropriate ONNX predictor, or convert to TF pb file.')
+            return Model.from_onnx(filename)
         elif '.pb' in filename:
             return Model(filename)
         raise Exception('Format not supported.')
@@ -107,7 +114,9 @@ class Predictor:
             score = self.model.run(batched_img)
             score = score
             
+            print(score.shape)
             output = np.argmax(score, 1)
+            print(output.shape)
 
             image = (batched_img / 2 + .5)
             layout = self.colorizer.apply(output)

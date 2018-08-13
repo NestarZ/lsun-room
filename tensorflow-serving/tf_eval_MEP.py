@@ -54,7 +54,7 @@ def main(input_size, model_path):
             #corner_points = minimum_bounding_rectangle(pts)
             corner_points = corner_points.astype(np.int32)
             polygon_pts = corner_points
-            polygon_pts_rdp = rdp(corner_points, epsilon=10)
+            #polygon_pts_rdp = rdp(corner_points, epsilon=10)
             cv2.fillPoly(output_layout, pts=[polygon_pts], color=COLORS[label])
             cv2.polylines(output_layout_edges, [polygon_pts], True,COLORS[label])
 

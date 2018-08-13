@@ -13,9 +13,10 @@ build_onnx:
 
 build_local:
 	cd ./lib/OneGan/ && python setup.py install
-	cd ./lib/lsun_room_api// && python setup.py install
+	cd ./lib/lsun_room_api/ && python setup.py install
 
 build: build_external build_onnx build_local
+	cd ./onnx-tensorflow/ && python setup.py install
 
 train: build_local
 	python main.py \
@@ -40,6 +41,13 @@ eval_search: build_local
 export: build_local
 	python main.py \
 		--phase export \
+		--arch resnet --pretrain_path exp/checkpoints/experience_v1_08-09T16-44/net-29.pt \
+		--name Test --tri_visual \
+		--gpu True
+
+export2keras: build_local
+	python main.py \
+		--phase export2keras \
 		--arch resnet --pretrain_path exp/checkpoints/experience_v1_08-09T16-44/net-29.pt \
 		--name Test --tri_visual \
 		--gpu True
